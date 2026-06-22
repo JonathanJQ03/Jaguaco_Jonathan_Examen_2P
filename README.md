@@ -9,25 +9,33 @@ Para evidenciar este procedimiento al archivo original el cual era transaction.m
 - Solución: Se dividio este archivo en otros 3 archivos para asi lograr cumplir con el principio de responsabilidad unica y pe ara el segundo principio se aplicó la inyección de dependencias de modo que modificamos los Controladores account.controller.js  y transfer.controller.js para que funcionen a través de constructores con class
 ![Resultado de Principio Solid 1:](./Evidencias/ev1.png)
 ![Inserción de Class:](./Evidencias/ev2.png)
+- Asi fue como creamos un archivo di.js para inyectar las dependencias
+![Resultado de Inyección de Dependencias:](./Evidencias/ev3.png)
+
+### Resultado:
+La parte funcional de esta fase se mantiene igual no cambio unicamente se ven los cambios dentro de la legibilidad y mantenimiento dentro del codigo.
+
+
 
 ### Fase 2: Seguridad & Autenticación Asimétrica Stateless (JWT RS256)
-Se emplearon llaves públicas y privadas (PKCS#8) generadas vía OpenSSL y se ha configurado la firma y validación de tokens JWT mediante el algoritmo asimétrico **RS256**. El middleware `auth.middleware.js` realiza la validación de forma autónoma usando únicamente la llave pública, la cual es cargada mediante variables de entorno seguras. 
+Para evidenciar la resolución de esta fase se realizó el siguiente proceso.
 
-> **Directriz Crítica**: El archivo `.env` y las llaves `.pem` generadas han sido exitosamente excluidos del repositorio mediante `.gitignore`. Se provee una plantilla segura en `.env.example`.
+- Keypar.sh: Este archivo se un generador de llaves privadas y publicas el cual es ejecutado en la terminal usando el comando openssl una llave privada generada para firmar y la otra publica para verifica
+- .env: usado para definir las rutas de las llaves y no usar rutas fijas o "quemadas" en el código fuente
+- Tambien aquí defini el .gitignore en el cual se encuentra los archivos .pem .env .env.example ya que estos no deben ser subidos al repositorio publico de github 
+- Services/jwt.service.js: Modificamos el archivo para que use las llaves privadas y publicas para firmar y verificar los tokens,forzar una expiracion de 2 minutos y agregar el id del usuario en el token
+- auti.middleware.js: Este de aqui extrae el header es decir el "autorization" verificando su beares si todo resulta bien entonces se procede a darle paso caso contrario nos vamos a una pantalla de error HTTP 401
 
-**Evidencia 1: Postman - JWT Generado y Accesos Válidos**
-*(Reemplazar con la captura de pantalla de Postman validando el acceso a un endpoint protegido)*
+**Evidencia 1: Token Generado por el script generate-token.js en la terminal**
+![Token Generado:](./Evidencias/ev4.png)
 
-**Evidencia 2: Postman - JWT Expirado (Error 401)**
-*(Reemplazar con la captura de pantalla de Postman mostrando el error 401)*
-
-### Fase 3: Observabilidad & Error Tracking Real-Time (Sentry)
-El backend cuenta con instrumentación del SDK de Sentry (`@sentry/node` v8). Los controladores manejan y diferencian correctamente los errores lógicos (que responden con códigos HTTP seguros) y los errores operacionales (crash de conexión simulado que responde 500 y alerta a la nube).
-
-**Evidencia 3: Panel de Sentry - Error Operacional 500 Capturado con Tags de Usuario**
-*(Reemplazar con la captura de pantalla del dashboard de Sentry mostrando el fallo "Conexión interrumpida..." y el tag `user_id` capturado del JWT)*
-
----
+**Evidencia Saldo Cuenta JWT valido**
+- Se uso la herramienta de Curl dentro de Linux para probar de maenra rapida el endpoint con el token JWT obtenido.
+![Acceso al Sistema:](./Evidencias/ev5.png)
+**Evidencia JWT Expirado (Error 401)**
+- Se volvio a realizar la misma petición con Curl pero como el token tiene un tiempo de uso y este expiro entonces el sistema no permite ingresar y nos vota este error
+![Error 401:](./Evidencias/ev7.png)
 ## Trazabilidad de Autoría (GitOps)
 - Se manejaron ramas individuales: `feature/01-refactor-solid`, `feature/02-auth-jwt` y `feature/03-observabilidad`.
 - Se aplicó la convención de Commits Semánticos (Ej: `refactor(solid): ...`, `feat(jwt): ...`, `feat(sentry): ...`).
+![Ramas GitHub:](./Evidencias/ev6.png)
