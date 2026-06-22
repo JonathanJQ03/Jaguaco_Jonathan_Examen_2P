@@ -33,17 +33,55 @@ Inicia la API (`npm run dev`). La funcionalidad de la aplicación no debió camb
   - **Llave Privada** (`private.pem`): Nunca sale del servidor central. Se usa exclusivamente para **Firmar** el token (es decir, ponerle un sello de autenticidad y fecha de expiración).
   - **Llave Pública** (`public.pem`): Puede estar distribuida en múltiples microservicios (Alpha, Beta, etc.). Se usa exclusivamente para **Verificar** si el token que manda el cliente realmente fue firmado por la llave privada original.
 
-### ¿Qué hicimos en el código?
-1. **Generación de Llaves**: Corrimos tu script de Bash invocando OpenSSL para generar el par de llaves en formato estándar PKCS#8.
-2. **Carga Segura de Variables**: En lugar de "quemar" las rutas de las llaves en texto plano en el código (lo cual es inseguro e inflexible), agregamos soporte para un archivo `.env` y blindamos el repositorio evitando que se suban los `.pem` usando el `.gitignore`.
-3. **Módulo JWT**: En `jwt.service.js`, leemos las llaves. En `signToken` le inyectamos los datos del usuario (`sub` y `name`) y configuramos una expiración forzosa de 2 minutos (`expiresIn: '2m'`).
-4. **Middleware Interceptor**: El `auth.middleware.js` lee los headers HTTP de la petición, rescata el Bearer Token, y lo valida empleando `jwt.verify` y la llave pública.
+### Detalles de Implementación y Archivos Trabajados
+Para implementar esta seguridad, intervinimos directamente en **5 archivos clave**:
 
-### ¿Cómo probarlo?
-1. Corre el comando `node generate-token.js` en tu consola. Te escupirá un JWT larguísimo recién generado.
-2. En Postman, intenta hacer un `GET` a `/v1/account-alpha/balance?accountId=ACC-12345` sin autenticación. Te arrojará un error 401 (No autorizado).
-3. En la pestaña Headers de Postman envía `Authorization: Bearer <pega_tu_token_aqui>`. Te dejará pasar.
-4. Espera pacientemente 2 minutos. Vuelve a disparar la petición, y el middleware atrapará automáticamente que la fecha interna del token ha caducado y te botará con un 401 por "Token expirado".
+1. **`keypair.sh` (Generador de Llaves)**: 
+   - Lo ejecutamos en la terminal mediante bash. Este script internamente usó el comando `openssl` para generar un par de llaves: `private.pem` (para firmar) y `public.pem` (para verificar).
+   - Estas llaves tienen formato PKCS#8, el cual es el estándar moderno recomendado.
+
+2. **`.env` y `.gitignore` (Seguridad de Variables)**:
+   - Para evitar penalizaciones de seguridad y prevenir subir archivos confidenciales a GitHub, configuramos el `.gitignore` para ignorar `*.pem` y `.env`.
+   - Creamos el `.env` (y su plantilla `.env.example`) donde definimos las rutas de las llaves (`PRIVATE_KEY_PATH=./private.pem`). De este modo, evitamos usar "rutas fijas" o "quemadas" en el código fuente.
+
+3. **`src/services/jwt.service.js` (Motor de JWT)**:
+   - Aquí programamos la **Firma Asimétrica**. Usamos `fs.readFileSync` apuntando a las rutas del `.env` para leer el contenido real de los `.pem`.
+   - Modificamos la función `signToken` para que reciba los datos del usuario y construya el payload. Incluimos el claim estándar `sub` (Subject / ID del usuario) y forzamos la expiración a 2 minutos usando la opción `expiresIn: '2m'`. La firma usa explícitamente el algoritmo `{ algorithm: 'RS256' }`.
+   - Modificamos la función `verifyToken` para que lea **solamente** la llave pública (`public.pem`) y verifique que el token no ha sido alterado, usando `jwt.verify(..., { algorithms: ['RS256'] })`.
+
+4. **`src/middlewares/auth.middleware.js` (Interceptor de Peticiones)**:
+   - Convertimos este archivo en un guardián de rutas. Toda petición a un microservicio pasa por aquí primero.
+   - Extraemos el header `Authorization` y verificamos que empiece con `Bearer `.
+   - Luego, extraemos el token y usamos nuestro `jwt.service.js` para validarlo.
+   - Si todo está bien, adjuntamos la data del usuario en `req.user` para uso futuro y llamamos a `next()` para dejar pasar la solicitud. Si el token está caducado (pasaron los 2 minutos), el bloque `try/catch` lo intercepta y bloquea la solicitud respondiendo un HTTP 401.
+
+### ¿Cómo verificar y probar esto mediante URLs?
+
+Puedes probar toda esta fase usando **Postman** (o herramientas como Insomnia / cURL) interactuando directamente con las URLs de tu servidor local. 
+
+**Paso 1: Generar un Token de Prueba**
+Como tu aplicación base no tiene un endpoint de Login implementado para el usuario, te creé un script de soporte llamado `generate-token.js`.
+- Ejecuta en tu terminal de VSCode: `node generate-token.js`
+- Copia la cadena larga de texto que te imprime la consola (ese es tu JWT recién firmado con tu llave privada).
+
+**Paso 2: Prueba de Acceso Válido (Token Fresco)**
+- Abre Postman.
+- **Método**: Selecciona `GET`.
+- **URL**: Ingresa `http://localhost:3000/v1/account-alpha/balance?accountId=ACC-12345`
+- **Headers**: Ve a la pestaña de "Authorization", selecciona "Bearer Token" y pega el token que copiaste en el Paso 1. (O manualmente en la pestaña Headers agrega `Authorization: Bearer <tu_token>`).
+- Haz clic en **Send**.
+- **Resultado Esperado**: El servidor te dará un código HTTP 200 OK y verás el JSON con tu saldo. El middleware usó la llave pública y certificó que el token era auténtico.
+
+**Paso 3: Prueba de Bloqueo por Caducidad (Token Expirado)**
+- Mantén la misma URL en Postman sin mover nada.
+- **Espera pacientemente 2 minutos y 1 segundo**.
+- Vuelve a dar clic en **Send**.
+- **Resultado Esperado**: El servidor interceptará la petición, la llave pública se dará cuenta de que la fecha interna del token ya expiró, y **bloqueará la ruta** devolviéndote un JSON de error con un código **HTTP 401 (Unauthorized)** detallando que el "Token ha expirado".
+
+**Paso 4: Prueba de Bloqueo por Falta de Credenciales**
+- En la misma URL, desmarca o elimina el Header de Authorization.
+- Haz clic en **Send**.
+- **Resultado Esperado**: El servidor te botará con un error **HTTP 401** porque "Falta la cabecera Authorization en la petición".
 
 ---
 

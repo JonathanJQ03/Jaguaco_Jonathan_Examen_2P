@@ -2,8 +2,13 @@
 
 ## Bitácora de Evidencias
 
-### Fase 1: Git Branching & Refactorización SOLID
-Se ha aplicado correctamente el Principio de Responsabilidad Única (SRP) y la Inversión de Dependencias (DIP) al monolito. La lógica financiera, base de datos en memoria y notificaciones fueron abstraídas en servicios independientes (`financial.service.js`, `database.service.js`, `notification.service.js`), inyectados vía constructor hacia los controladores mediante un contenedor de dependencias (`di.js`).
+### Fase 1: Git Branching & Refactorización SOLIDo
+Para evidenciar este procedimiento al archivo original el cual era transaction.monolith.service.js se identifico que se violaba 2 principios solid:
+1. S: El archivo contenia mas de una responsabilidad, ya que manejaba la logica financiera, la base de datos en memoria y las notificaciones.
+2. D: El archivo tenia dependencias de alto nivel y de bajo nivel, por lo que no se podia reutilizar la logica financiera en otro servicio.
+- Solución: Se dividio este archivo en otros 3 archivos para asi lograr cumplir con el principio de responsabilidad unica y pe ara el segundo principio se aplicó la inyección de dependencias de modo que modificamos los Controladores account.controller.js  y transfer.controller.js para que funcionen a través de constructores con class
+![Resultado de Principio Solid 1:](./Evidencias/ev1.png)
+![Inserción de Class:](./Evidencias/ev2.png)
 
 ### Fase 2: Seguridad & Autenticación Asimétrica Stateless (JWT RS256)
 Se emplearon llaves públicas y privadas (PKCS#8) generadas vía OpenSSL y se ha configurado la firma y validación de tokens JWT mediante el algoritmo asimétrico **RS256**. El middleware `auth.middleware.js` realiza la validación de forma autónoma usando únicamente la llave pública, la cual es cargada mediante variables de entorno seguras. 
