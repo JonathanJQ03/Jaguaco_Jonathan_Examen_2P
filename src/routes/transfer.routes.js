@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const transferController = require('../controllers/transfer.controller');
+const { transferController } = require('../di');
 const authMiddleware = require('../middlewares/auth.middleware');
 
 // POST /v1/transfer-beta/execute
